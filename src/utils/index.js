@@ -1,9 +1,18 @@
 export function setProps(dom, odlProps, newProps) {
   for (let key in odlProps) {
+    if (key !== "children") {
+      if (newProps.hasOwnProperty(key)) {
+        setProp(dom, key, newProps[key]);
+      }else {
+        dom.removeAttribute(key);
+      }
+    }
   }
   for (let key in newProps) {
     if (key !== "children") {
-      setProp(dom, key, newProps[key]);
+      if(!odlProps.hasOwnProperty(key)){
+        setProp(dom, key, newProps[key]);
+      }
     }
   }
 }
