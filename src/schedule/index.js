@@ -4,15 +4,29 @@ import {
   TAG_TEXT,
   TEXT_ELEMENT,
   PLACEMENT,
+  UPDATE,
+  DELETEMENT,
 } from "../constants";
-import { setProps } from "../utils";
+import {setProps} from "../utils";
 
 let nextUnitOfWork = null; // 下一个工作单元
 let workInProgerssRoot = null; // 当前使用的fiber节点
+let currentRoot = null;
+let deletions = [];
 
 function schedule(rootFiber) {
-  nextUnitOfWork = rootFiber;
-  workInProgerssRoot = rootFiber;
+  if (currentRoot && currentRoot.alternate) {
+    workInProgerssRoot = currentRoot.alternate;
+    workInProgerssRoot.props = rootFiber.props;
+    workInProgerssRoot.alternate = currentRoot;
+  } else if (currentRoot) {
+    rootFiber.alternate = currentRoot;
+    workInProgerssRoot = rootFiber;
+  } else {
+    workInProgerssRoot = rootFiber;
+  }
+  workInProgerssRoot.firstEffect = workInProgerssRoot.nextEffect = workInProgerssRoot.lastEffect = null;
+  nextUnitOfWork = workInProgerssRoot;
   requestIdleCallback(workLoop);
 }
 
@@ -84,7 +98,7 @@ function createDOM(currentFiber) {
   }
   if (currentFiber.tag === TAG_HOST) {
     let stateNode = document.createElement(currentFiber.type);
-    updateDOM(stateNode, {}, { ...currentFiber.props });
+    updateDOM(stateNode, {}, {...currentFiber.props});
     return stateNode;
   }
 }
@@ -94,18 +108,54 @@ function updateDOM(stateNode, odlProps, newProps) {
 function reconcilerChildren(newChildren, currentFiber) {
   let currentIndex = 0;
   let preSibing; // 上一个子节点
-  while (currentIndex < currentFiber.props.children.length) {
-    let newChild = newChildren[currentIndex];
 
-    let newFiber = {
-      tag: newChild.type === TEXT_ELEMENT ? TAG_TEXT : TAG_HOST,
-      type: newChild.type,
-      props: newChild.props,
-      stateNode: null,
-      return: currentFiber,
-      effectTag: PLACEMENT,
-      nextEffect: null,
-    };
+  let oldFiber = currentFiber.alternate && currentFiber.alternate.child;
+
+  while (currentIndex < currentFiber.props.children.length || oldFiber) {
+    let newChild = newChildren[currentIndex];
+    let newFiber;
+
+    let sameType = oldFiber && newChild && oldFiber.type === newChild.type;
+    let tag;
+
+    if (newChild && newChild.type === TEXT_ELEMENT) {
+      tag = TAG_TEXT;
+    } else if (newChild && typeof newChild.type === "string") {
+      tag = TAG_HOST;
+    }
+    if (sameType) {
+      newFiber = {
+        tag: oldFiber.tag,
+        type: oldFiber.type,
+        props: newChild.props,
+        stateNode: oldFiber.stateNode,
+        return: currentFiber,
+        effectTag: UPDATE,
+        nextEffect: null,
+        alternate: oldFiber,
+      };
+    } else {
+      if (newChild) {
+        newFiber = {
+          // tag: newChild && newChild.type === TEXT_ELEMENT ? TAG_TEXT : TAG_HOST,
+          tag,
+          type: newChild.type,
+          props: newChild.props,
+          stateNode: null,
+          return: currentFiber,
+          effectTag: PLACEMENT,
+          nextEffect: null,
+        };
+      }
+      if (oldFiber) {
+        oldFiber.effectTag = DELETEMENT;
+        deletions.push(oldFiber);
+      }
+    }
+
+    if (oldFiber) {
+      oldFiber = oldFiber.sibing;
+    }
 
     if (newFiber) {
       if (currentIndex === 0) {
@@ -146,11 +196,14 @@ function completeUnitOfWork(currentFiber) {
   }
 }
 function commitRoot() {
+  deletions.forEach(commitWork);
   let currentFiber = workInProgerssRoot.firstEffect;
   while (currentFiber) {
     commitWork(currentFiber);
     currentFiber = currentFiber.nextEffect;
   }
+  deletions.length = 0;
+  currentRoot = workInProgerssRoot;
   workInProgerssRoot = null;
 }
 function commitWork(currentFiber) {
@@ -159,8 +212,21 @@ function commitWork(currentFiber) {
   let returnDOM = returnFiber.stateNode;
   if (currentFiber.effectTag === PLACEMENT) {
     returnDOM.appendChild(currentFiber.stateNode);
+  } else if (currentFiber.effectTag === UPDATE) {
+    if (currentFiber.type === TEXT_ELEMENT) {
+      if (currentFiber.alternate.props.text !== currentFiber.props.text) {
+        currentFiber.stateNode.textContent = currentFiber.props.text;
+      }
+    } else {
+      updateDOM(
+        currentFiber.stateNode,
+        currentFiber.alternate.props,
+        currentFiber.props
+      );
+    }
+  } else if (currentFiber.effectTag === DELETEMENT) {
+    returnDOM.removeChild(currentFiber.stateNode);
   }
-  console.log(workInProgerssRoot);
   // currentFiber.effectTag = null;
 }
-export { schedule };
+export {schedule};
