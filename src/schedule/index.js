@@ -25,7 +25,10 @@ function schedule(rootFiber) {
   } else {
     workInProgerssRoot = rootFiber;
   }
-  workInProgerssRoot.firstEffect = workInProgerssRoot.nextEffect = workInProgerssRoot.lastEffect = null;
+  workInProgerssRoot.firstEffect =
+    workInProgerssRoot.nextEffect =
+    workInProgerssRoot.lastEffect =
+      null;
   nextUnitOfWork = workInProgerssRoot;
   requestIdleCallback(workLoop);
 }
@@ -124,16 +127,25 @@ function reconcilerChildren(newChildren, currentFiber) {
       tag = TAG_HOST;
     }
     if (sameType) {
-      newFiber = {
-        tag: oldFiber.tag,
-        type: oldFiber.type,
-        props: newChild.props,
-        stateNode: oldFiber.stateNode,
-        return: currentFiber,
-        effectTag: UPDATE,
-        nextEffect: null,
-        alternate: oldFiber,
-      };
+      if (oldFiber.alternate) {
+        newFiber = oldFiber.alternate;
+        newFiber.props = newChild.props;
+        newFiber.alternate = oldFiber;
+        newFiber.effectTag = UPDATE;
+        newFiber.nextEffect = null;
+      }else{
+        newFiber = {
+          tag: oldFiber.tag,
+          type: oldFiber.type,
+          props: newChild.props,
+          stateNode: oldFiber.stateNode,
+          return: currentFiber,
+          effectTag: UPDATE,
+          nextEffect: null,
+          alternate: oldFiber,
+        };
+      }
+      
     } else {
       if (newChild) {
         newFiber = {
