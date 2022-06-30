@@ -1,30 +1,37 @@
-// import React from "./React";
+import React from "./React";
 
-// import ReactDOM from "./ReactDom";
+import ReactDOM from "./ReactDom";
 
-import React, {Component} from "react";
-import ReactDOM from "react-dom";
+// import React, {Component} from "react";
+// import ReactDOM from "react-dom";
 
-class Counter extends Component {
+class Counter extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      counter: 0
-    }
+      counter: 0,
+    };
   }
   counterUp() {
-    this.setState(state => ({
-      counter: state.counter +1
-    }))
+    this.setState((state) => ({
+      counter: state.counter + 1,
+    }));
   }
   render() {
-    return <div>
-      {this.state.counter}
+    return (
       <div>
-        <button onClick={()=>{this.counterUp()}}>+</button>
+        {this.state.counter}
+        <div>
+          <button
+            onClick={() => {
+              this.counterUp();
+            }}
+          >
+            +
+          </button>
+        </div>
       </div>
-    </div>;
+    );
   }
 }
-
-ReactDOM.render(<Counter />, document.getElementById("root"));
+ReactDOM.render(<Counter name="hello" />, document.getElementById("root"));

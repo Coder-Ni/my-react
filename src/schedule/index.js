@@ -6,8 +6,11 @@ import {
   PLACEMENT,
   UPDATE,
   DELETEMENT,
+  TAG_CLASS,
+  TAG_FUNCTION,
 } from "../constants";
-import {setProps} from "../utils";
+import { UpdateQueue } from "../updateQueue";
+import { setProps } from "../utils";
 
 let nextUnitOfWork = null; // 下一个工作单元
 let workInProgerssRoot = null; // 当前使用的fiber节点
@@ -15,6 +18,7 @@ let currentRoot = null;
 let deletions = [];
 
 function schedule(rootFiber) {
+  console.log(rootFiber);
   if (currentRoot && currentRoot.alternate) {
     workInProgerssRoot = currentRoot.alternate;
     workInProgerssRoot.props = rootFiber.props;
@@ -43,10 +47,9 @@ function workLoop(deadline) {
     nextUnitOfWork = performUnitOfWork(nextUnitOfWork);
     shouldYield = deadline.timeRemaining() > 1;
   }
-
   if (!nextUnitOfWork) {
     console.log("reder结束");
-    commitRoot();
+    // commitRoot();
   } else {
     requestIdleCallback(workLoop);
   }
@@ -61,6 +64,7 @@ function performUnitOfWork(currentFiber) {
   if (currentFiber.child) {
     return currentFiber.child;
   }
+  // return console.log(currentFiber);
   while (currentFiber) {
     completeUnitOfWork(currentFiber);
     if (currentFiber.sibing) {
@@ -77,6 +81,10 @@ function beginWork(currentFiber) {
     updateHostText(currentFiber);
   } else if (currentFiber.tag === TAG_HOST) {
     updateHost(currentFiber);
+  } else if (currentFiber.tag === TAG_CLASS) {
+    updateCLASS(currentFiber);
+  } else if (currentFiber.tag === TAG_FUNCTION) {
+    updateFUNCTION(currentFiber);
   }
 }
 function updateHostRoot(currentFiber) {
@@ -95,13 +103,30 @@ function updateHost(currentFiber) {
   let newChildren = currentFiber.props.children;
   reconcilerChildren(newChildren, currentFiber);
 }
+function updateCLASS(currentFiber) {
+  if (!currentFiber.stateNode) {
+    currentFiber.stateNode = new currentFiber.type(currentFiber.props);
+    currentFiber.stateNode.internalFiber = currentFiber;
+    currentFiber.updateQueue = new UpdateQueue();
+  }
+  currentFiber.stateNode.state = currentFiber.updateQueue.forceUpdate(
+    currentFiber.stateNode.state
+  );
+  let newElement = currentFiber.stateNode.render();
+  console.log(newElement);
+  const newChildren = [newElement];
+  reconcilerChildren(newChildren, currentFiber);
+  // schedule();
+}
+function updateFUNCTION(currentFiber) {}
+
 function createDOM(currentFiber) {
   if (currentFiber.tag === TAG_TEXT) {
     return document.createTextNode(currentFiber.props.text);
   }
   if (currentFiber.tag === TAG_HOST) {
     let stateNode = document.createElement(currentFiber.type);
-    updateDOM(stateNode, {}, {...currentFiber.props});
+    updateDOM(stateNode, {}, { ...currentFiber.props });
     return stateNode;
   }
 }
@@ -109,6 +134,8 @@ function updateDOM(stateNode, odlProps, newProps) {
   setProps(stateNode, odlProps, newProps);
 }
 function reconcilerChildren(newChildren, currentFiber) {
+  console.log("currentFiber", currentFiber);
+  console.log("newChildren", newChildren);
   let currentIndex = 0;
   let preSibing; // 上一个子节点
 
@@ -125,7 +152,14 @@ function reconcilerChildren(newChildren, currentFiber) {
       tag = TAG_TEXT;
     } else if (newChild && typeof newChild.type === "string") {
       tag = TAG_HOST;
+    } else if (
+      newChild &&
+      typeof newChild.type === "function" &&
+      newChild.type.prototype.isReactComponent
+    ) {
+      tag = TAG_CLASS;
     }
+
     if (sameType) {
       if (oldFiber.alternate) {
         newFiber = oldFiber.alternate;
@@ -133,7 +167,7 @@ function reconcilerChildren(newChildren, currentFiber) {
         newFiber.alternate = oldFiber;
         newFiber.effectTag = UPDATE;
         newFiber.nextEffect = null;
-      }else{
+      } else {
         newFiber = {
           tag: oldFiber.tag,
           type: oldFiber.type,
@@ -145,7 +179,6 @@ function reconcilerChildren(newChildren, currentFiber) {
           alternate: oldFiber,
         };
       }
-      
     } else {
       if (newChild) {
         newFiber = {
@@ -241,4 +274,4 @@ function commitWork(currentFiber) {
   }
   // currentFiber.effectTag = null;
 }
-export {schedule};
+export { schedule };
