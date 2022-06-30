@@ -9,8 +9,8 @@ import {
   TAG_CLASS,
   TAG_FUNCTION,
 } from "../constants";
-import { UpdateQueue } from "../updateQueue";
-import { setProps } from "../utils";
+import {UpdateQueue} from "../updateQueue";
+import {setProps} from "../utils";
 
 let nextUnitOfWork = null; // 下一个工作单元
 let workInProgerssRoot = null; // 当前使用的fiber节点
@@ -18,14 +18,22 @@ let currentRoot = null;
 let deletions = [];
 
 function schedule(rootFiber) {
-  console.log(rootFiber);
   if (currentRoot && currentRoot.alternate) {
     workInProgerssRoot = currentRoot.alternate;
-    workInProgerssRoot.props = rootFiber.props;
     workInProgerssRoot.alternate = currentRoot;
+    if (rootFiber) {
+      workInProgerssRoot.props = rootFiber.props;
+    }
   } else if (currentRoot) {
-    rootFiber.alternate = currentRoot;
-    workInProgerssRoot = rootFiber;
+    if (rootFiber) {
+      rootFiber.alternate = currentRoot;
+      workInProgerssRoot = rootFiber;
+    } else {
+      workInProgerssRoot = {
+        ...currentRoot,
+        alternate: currentRoot,
+      };
+    }
   } else {
     workInProgerssRoot = rootFiber;
   }
@@ -49,7 +57,7 @@ function workLoop(deadline) {
   }
   if (!nextUnitOfWork) {
     console.log("reder结束");
-    // commitRoot();
+    commitRoot();
   } else {
     requestIdleCallback(workLoop);
   }
@@ -64,7 +72,6 @@ function performUnitOfWork(currentFiber) {
   if (currentFiber.child) {
     return currentFiber.child;
   }
-  // return console.log(currentFiber);
   while (currentFiber) {
     completeUnitOfWork(currentFiber);
     if (currentFiber.sibing) {
@@ -87,15 +94,18 @@ function beginWork(currentFiber) {
     updateFUNCTION(currentFiber);
   }
 }
+
 function updateHostRoot(currentFiber) {
   let newChildren = currentFiber.props.children;
   reconcilerChildren(newChildren, currentFiber);
 }
+
 function updateHostText(currentFiber) {
   if (!currentFiber.stateNode) {
     currentFiber.stateNode = createDOM(currentFiber);
   }
 }
+
 function updateHost(currentFiber) {
   if (!currentFiber.stateNode) {
     currentFiber.stateNode = createDOM(currentFiber);
@@ -103,6 +113,7 @@ function updateHost(currentFiber) {
   let newChildren = currentFiber.props.children;
   reconcilerChildren(newChildren, currentFiber);
 }
+
 function updateCLASS(currentFiber) {
   if (!currentFiber.stateNode) {
     currentFiber.stateNode = new currentFiber.type(currentFiber.props);
@@ -113,11 +124,11 @@ function updateCLASS(currentFiber) {
     currentFiber.stateNode.state
   );
   let newElement = currentFiber.stateNode.render();
-  console.log(newElement);
   const newChildren = [newElement];
   reconcilerChildren(newChildren, currentFiber);
   // schedule();
 }
+
 function updateFUNCTION(currentFiber) {}
 
 function createDOM(currentFiber) {
@@ -126,25 +137,33 @@ function createDOM(currentFiber) {
   }
   if (currentFiber.tag === TAG_HOST) {
     let stateNode = document.createElement(currentFiber.type);
-    updateDOM(stateNode, {}, { ...currentFiber.props });
+    updateDOM(
+      stateNode,
+      {},
+      {
+        ...currentFiber.props,
+      }
+    );
     return stateNode;
   }
 }
+
 function updateDOM(stateNode, odlProps, newProps) {
   setProps(stateNode, odlProps, newProps);
 }
+
 function reconcilerChildren(newChildren, currentFiber) {
-  console.log("currentFiber", currentFiber);
-  console.log("newChildren", newChildren);
   let currentIndex = 0;
   let preSibing; // 上一个子节点
 
   let oldFiber = currentFiber.alternate && currentFiber.alternate.child;
+  if (oldFiber) {
+    oldFiber.firstEffect = oldFiber.lastEffect = oldFiber.nextEffect = null;
+  }
 
-  while (currentIndex < currentFiber.props.children.length || oldFiber) {
+  while (currentIndex < newChildren.length || oldFiber) {
     let newChild = newChildren[currentIndex];
     let newFiber;
-
     let sameType = oldFiber && newChild && oldFiber.type === newChild.type;
     let tag;
 
@@ -167,6 +186,7 @@ function reconcilerChildren(newChildren, currentFiber) {
         newFiber.alternate = oldFiber;
         newFiber.effectTag = UPDATE;
         newFiber.nextEffect = null;
+        newFiber.updateQueue = oldFiber.updateQueue || new UpdateQueue();
       } else {
         newFiber = {
           tag: oldFiber.tag,
@@ -177,6 +197,7 @@ function reconcilerChildren(newChildren, currentFiber) {
           effectTag: UPDATE,
           nextEffect: null,
           alternate: oldFiber,
+          updateQueue: oldFiber.updateQueue || new UpdateQueue(),
         };
       }
     } else {
@@ -190,6 +211,7 @@ function reconcilerChildren(newChildren, currentFiber) {
           return: currentFiber,
           effectTag: PLACEMENT,
           nextEffect: null,
+          updateQueue: new UpdateQueue(),
         };
       }
       if (oldFiber) {
@@ -214,6 +236,7 @@ function reconcilerChildren(newChildren, currentFiber) {
     currentIndex++;
   }
 }
+
 function completeUnitOfWork(currentFiber) {
   let returnFiber = currentFiber.return;
   if (returnFiber) {
@@ -240,6 +263,7 @@ function completeUnitOfWork(currentFiber) {
     }
   }
 }
+
 function commitRoot() {
   deletions.forEach(commitWork);
   let currentFiber = workInProgerssRoot.firstEffect;
@@ -251,27 +275,49 @@ function commitRoot() {
   currentRoot = workInProgerssRoot;
   workInProgerssRoot = null;
 }
+
 function commitWork(currentFiber) {
   if (!currentFiber) return;
   let returnFiber = currentFiber.return;
+  let domTags = [TAG_ROOT, TAG_TEXT, TAG_HOST];
+  while (!domTags.includes(returnFiber.tag)) {
+    returnFiber = returnFiber.return;
+  }
+
   let returnDOM = returnFiber.stateNode;
   if (currentFiber.effectTag === PLACEMENT) {
-    returnDOM.appendChild(currentFiber.stateNode);
+    let nextFiber = currentFiber;
+    if(nextFiber.tag === TAG_CLASS) return;
+    while (nextFiber.tag !== TAG_HOST && nextFiber.tag !== TAG_TEXT) {
+      nextFiber = currentFiber.child;
+    }
+    returnDOM.appendChild(nextFiber.stateNode);
   } else if (currentFiber.effectTag === UPDATE) {
     if (currentFiber.type === TEXT_ELEMENT) {
       if (currentFiber.alternate.props.text !== currentFiber.props.text) {
         currentFiber.stateNode.textContent = currentFiber.props.text;
       }
     } else {
-      updateDOM(
-        currentFiber.stateNode,
-        currentFiber.alternate.props,
-        currentFiber.props
-      );
+      if (currentFiber.tag !== TAG_CLASS) {
+        updateDOM(
+          currentFiber.stateNode,
+          currentFiber.alternate.props,
+          currentFiber.props
+        );
+      }
     }
   } else if (currentFiber.effectTag === DELETEMENT) {
-    returnDOM.removeChild(currentFiber.stateNode);
+    commitDelete(currentFiber, returnDOM);
+    // returnDOM.removeChild(currentFiber.stateNode);
   }
   // currentFiber.effectTag = null;
 }
-export { schedule };
+
+function commitDelete(currentFiber, returnDOM) {
+  if (currentFiber.tag === TAG_HOST || currentFiber.tag === TAG_TEXT) {
+    returnDOM.removeChild(currentFiber.stateNode);
+  } else {
+    commitDelete(currentFiber.child, returnDOM);
+  }
+}
+export {schedule};

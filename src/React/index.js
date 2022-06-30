@@ -44,8 +44,6 @@ class Component {
 }
 Component.prototype.isReactComponent = {};
 
-// console.log(typeof new Component());
-// console.log(new Component());
 const React = {
   createElement,
   Component,
