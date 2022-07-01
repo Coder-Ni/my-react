@@ -34,4 +34,35 @@ class Counter extends React.Component {
     );
   }
 }
-ReactDOM.render(<Counter name="hello" />, document.getElementById("root"));
+
+const increment = "increment";
+const decrement = "decrement";
+function reducer(state, action) {
+  switch (action.type) {
+    case "increment":
+      return { count: state.count + 1 };
+    case "decrement":
+      return { count: state.count - 1 };
+    default:
+      throw new Error();
+  }
+}
+
+function Count() {
+  const [counter, dispatch] = React.useReducer(reducer, { count: 0 });
+  const [counter2, dispatch2] = React.useReducer(reducer, { count: 0 });
+
+  return (
+    <div>
+      {counter.count}
+      <div></div>
+      {counter2.count}
+      <div>
+        <button onClick={() => dispatch({ type: increment })}>+</button>
+        <button onClick={() => dispatch({ type: decrement })}>-</button>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.render(<Count counter="1" />, document.getElementById("root"));
