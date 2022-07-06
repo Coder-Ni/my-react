@@ -1,6 +1,6 @@
 import { TEXT_ELEMENT } from "../constants";
-import { schedule } from "../schedule";
-import { Update, UpdateQueue } from "../updateQueue";
+import { schedule, useReducer, useState } from "../schedule";
+import { Update } from "../updateQueue";
 
 /**
  * @param {*} type
@@ -47,6 +47,8 @@ Component.prototype.isReactComponent = {};
 const React = {
   createElement,
   Component,
+  useReducer,
+  useState
 };
 
 export default React;

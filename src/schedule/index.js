@@ -9,13 +9,15 @@ import {
   TAG_CLASS,
   TAG_FUNCTION,
 } from "../constants";
-import {UpdateQueue} from "../updateQueue";
-import {setProps} from "../utils";
+import { Update, UpdateQueue } from "../updateQueue";
+import { setProps } from "../utils";
 
 let nextUnitOfWork = null; // 下一个工作单元
 let workInProgerssRoot = null; // 当前使用的fiber节点
 let currentRoot = null;
 let deletions = [];
+let workInProgerssFiber = null;
+let hookIndex = 0;
 
 function schedule(rootFiber) {
   if (currentRoot && currentRoot.alternate) {
@@ -129,7 +131,13 @@ function updateCLASS(currentFiber) {
   // schedule();
 }
 
-function updateFUNCTION(currentFiber) {}
+function updateFUNCTION(currentFiber) {
+  workInProgerssFiber = currentFiber;
+  hookIndex = 0;
+  workInProgerssFiber.hooks = [];
+  const newChildren = [currentFiber.type(currentFiber.props)];
+  reconcilerChildren(newChildren, currentFiber);
+}
 
 function createDOM(currentFiber) {
   if (currentFiber.tag === TAG_TEXT) {
@@ -149,7 +157,8 @@ function createDOM(currentFiber) {
 }
 
 function updateDOM(stateNode, odlProps, newProps) {
-  setProps(stateNode, odlProps, newProps);
+  if (stateNode && stateNode.setAttribute)
+    setProps(stateNode, odlProps, newProps);
 }
 
 function reconcilerChildren(newChildren, currentFiber) {
@@ -177,6 +186,8 @@ function reconcilerChildren(newChildren, currentFiber) {
       newChild.type.prototype.isReactComponent
     ) {
       tag = TAG_CLASS;
+    } else if (newChild && typeof newChild.type === "function") {
+      tag = TAG_FUNCTION;
     }
 
     if (sameType) {
@@ -287,7 +298,7 @@ function commitWork(currentFiber) {
   let returnDOM = returnFiber.stateNode;
   if (currentFiber.effectTag === PLACEMENT) {
     let nextFiber = currentFiber;
-    if(nextFiber.tag === TAG_CLASS) return;
+    if (nextFiber.tag === TAG_CLASS) return;
     while (nextFiber.tag !== TAG_HOST && nextFiber.tag !== TAG_TEXT) {
       nextFiber = currentFiber.child;
     }
@@ -298,7 +309,7 @@ function commitWork(currentFiber) {
         currentFiber.stateNode.textContent = currentFiber.props.text;
       }
     } else {
-      if (currentFiber.tag !== TAG_CLASS) {
+      if (currentFiber.tag !== TAG_CLASS && currentFiber.tag !== TAG_FUNCTION)  {
         updateDOM(
           currentFiber.stateNode,
           currentFiber.alternate.props,
@@ -320,4 +331,29 @@ function commitDelete(currentFiber, returnDOM) {
     commitDelete(currentFiber.child, returnDOM);
   }
 }
-export {schedule};
+
+export function useReducer(reducer, initalValue) {
+  let alternate = workInProgerssFiber.alternate;
+  let newHook = alternate && alternate.hooks && alternate.hooks[hookIndex];
+  if (newHook) {
+    newHook.state = newHook.updateQueue.forceUpdate(newHook.state);
+  } else {
+    newHook = {
+      state: initalValue,
+      updateQueue: new UpdateQueue(),
+    };
+  }
+  const dispatch = (action) => {
+    let playload = reducer ? reducer(newHook.state, action) : action;
+    newHook.updateQueue.enqueueUpdate(new Update(playload));
+    schedule();
+  };
+  workInProgerssFiber.hooks[hookIndex++] = newHook;
+  return [newHook.state, dispatch];
+}
+
+export function useState(initalValue) {
+  return useReducer(null, initalValue);
+}
+
+export { schedule };
