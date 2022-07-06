@@ -1,5 +1,5 @@
 import { TEXT_ELEMENT } from "../constants";
-import { schedule, useReducer } from "../schedule";
+import { schedule, useReducer, useState } from "../schedule";
 import { Update } from "../updateQueue";
 
 /**
@@ -48,6 +48,7 @@ const React = {
   createElement,
   Component,
   useReducer,
+  useState
 };
 
 export default React;

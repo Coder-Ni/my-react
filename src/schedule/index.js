@@ -309,7 +309,7 @@ function commitWork(currentFiber) {
         currentFiber.stateNode.textContent = currentFiber.props.text;
       }
     } else {
-      if (currentFiber.tag !== TAG_CLASS) {
+      if (currentFiber.tag !== TAG_CLASS && currentFiber.tag !== TAG_FUNCTION)  {
         updateDOM(
           currentFiber.stateNode,
           currentFiber.alternate.props,
@@ -350,6 +350,10 @@ export function useReducer(reducer, initalValue) {
   };
   workInProgerssFiber.hooks[hookIndex++] = newHook;
   return [newHook.state, dispatch];
+}
+
+export function useState(initalValue) {
+  return useReducer(null, initalValue);
 }
 
 export { schedule };
